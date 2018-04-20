@@ -20,16 +20,45 @@ int main(){
 }
 
 void drawPuzzle(){
+  
+  //Background Square
   struct rectangle rect;
   rect.left = TOPLEFTX;
   rect.right = TOPLEFTX+91;
   rect.top = TOPLEFTY;
   rect.bottom = TOPLEFTY + 91;
+  fill_rectangle(rect,BLACK)
+  
+  for(int i =0;i<9;i++){
+    for(int j=0;j<9;j++){
+      
+        //Number white box
+        rect.left = getBoxX(i);
+        rect.right = rect.left + 8;
+        rect.top = getBoxY(j);
+        rect.bottom = rect.top + 8;
+        fill_rectangle(rect,WHITE);
+        
+        //Number
+        if(boolMatrix[i][j]){
+          char buffer[2];
+          itoa(numberMatrix[i][j],buffer);
+          display_string_xy(buffer, (getBoxX(i) + 2 ), (getBoxY(i)+1));
+        }
+    }
+  }
   
   
   
 }
 
+uint8_t getBoxX(uint8_t i){
+  return TOPLEFTX + (10*i) + 1;
+}
+
+uint8_t getBoxY(uint8_t j){
+  return TOPLEFTY + (10*j) + 1;
+}
 
 uint8_t checkSolved(){
   uint8_t set[9];
