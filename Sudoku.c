@@ -1,99 +1,326 @@
 #include <avr/io.h>
-#include <avr/interrupt.h>
-#include <util/delay.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "lcd.h"
-#include "rotary.h"
+#include "ruota.h"
+#include "themes.h"
 
-#define TOPLEFTX 135
-#define TOPLEFTY 75
+#define CELLSIZE 23 /*Odd number means text aligned in centre, should be > 7 */
+#define TOPLEFTX (LCDHEIGHT/2) - ((9*(CELLSIZE+1))/2)
+#define TOPLEFTY (LCDWIDTH/2) - ((9*(CELLSIZE+1))/2)
 
-volatile uint8_t squarex;
-volatile uint8_t squarey;
+void drawPuzzle();
+void drawPointer();
+void updatePointer(uint8_t oldx,uint8_t oldy);
+void fillBoxOutline(uint8_t x, uint8_t y, uint16_t col);
+void fillCell(uint8_t x,uint8_t y, uint16_t col);
+void fillBackground(uint16_t col);
+void fillGridBackground(uint16_t col);
+void drawNumber(uint8_t x,uint8_t y, uint8_t number);
+uint8_t getBoxX(uint8_t i);
+uint8_t getBoxY(uint8_t i);
+uint8_t getCellX(uint8_t i);
+uint8_t getCellY(uint8_t j);
+uint8_t checkSolved();
+uint8_t checkSet(uint8_t set[9]);
 
-volatile uint8_t numberMatrix[9][9];
-uint8_t boolMatrix[9][9];
+volatile int8_t pointerx =0;
+volatile int8_t pointery =0;
+struct Theme theme = defaulttheme;
+
+/*    SOLVED GRID
+  {1,5,2,6,3,4,8,7,9},
+  {6,8,3,7,9,1,2,5,4},
+  {9,4,7,2,8,5,6,3,1},
+  {5,2,9,8,4,3,1,6,7},
+  {7,3,6,5,1,2,4,9,8},
+  {8,1,4,9,7,6,5,2,3},
+  {2,7,8,4,6,9,3,1,5},
+  {3,9,5,1,2,8,7,4,6},
+  {4,6,1,3,5,7,9,8,2}
+*/
+
+volatile int8_t numberMatrix[9][9]= {
+  {1,5,0,6,3,0,0,7,9},
+  {6,0,0,7,0,1,0,0,0},
+  {0,0,7,2,8,0,0,3,1},
+  {0,0,9,8,0,3,0,6,0},
+  {0,3,0,0,1,0,0,9,0},
+  {0,1,0,9,0,6,5,0,0},
+  {2,7,0,0,6,9,3,0,0},
+  {0,0,0,1,0,8,0,0,6},
+  {4,6,0,0,5,7,0,8,2}
+};
+
+/*Any non 0's are editable by the player.*/
+uint8_t boolMatrix[9][9] =
+{
+  {1,5,0,6,3,0,0,7,9},
+  {6,0,0,7,0,1,0,0,0},
+  {0,0,7,2,8,0,0,3,1},
+  {0,0,9,8,0,3,0,6,0},
+  {0,3,0,0,1,0,0,9,0},
+  {0,1,0,9,0,6,5,0,0},
+  {2,7,0,0,6,9,3,0,0},
+  {0,0,0,1,0,8,0,0,6},
+  {4,6,0,0,5,7,0,8,2}
+    
+};
 
 int main(){
-  
-  
+  rectangle rect;
+  init_lcd();
+  set_orientation(West);
+  //init_rotary();
+
+  fillBackground(theme.background);
+  drawPuzzle();
+  drawPointer();
+  os_init_ruota();
+  for(;;){
+    scan_encoder();
+    int delta = os_enc_delta();
+    if(delta){
+       // drawPuzzle();
+      if(!boolMatrix[pointery][pointerx]){
+        numberMatrix[pointery][pointerx] += delta;
+        if(numberMatrix[pointery][pointerx]<0) numberMatrix[pointery][pointerx] = 9;
+        numberMatrix[pointery][pointerx] = numberMatrix[pointery][pointerx]%10;
+        
+        if(numberMatrix[pointery][pointerx]){
+          display_color(theme.editable_numbers,theme.cell_background);
+          drawNumber(pointerx,pointery,numberMatrix[pointery][pointerx]);
+        } else {
+          fillCell(pointerx,pointery,theme.cell_background);
+        }
+      }
+    }
+    
+    
+    scan_switches();
+    if (get_switch_press(_BV(SWS))) {
+      uint8_t oldx = pointerx;
+      uint8_t oldy = pointery;
+      pointery+=1;
+      pointery = pointery%9;
+      updatePointer(oldx,oldy);
+    }
+    if (get_switch_press(_BV(SWN))) {
+      uint8_t oldx = pointerx;
+      uint8_t oldy = pointery;
+      pointery-=1;
+      if(pointery <0) pointery = 8; 
+      updatePointer(oldx,oldy);
+    }
+    
+   if (get_switch_press(_BV(SWE))) {
+      uint8_t oldx = pointerx;
+      uint8_t oldy = pointery;
+      pointerx+=1;
+      pointerx = pointerx%9;
+      updatePointer(oldx,oldy);
+    }
+    
+   if (get_switch_press(_BV(SWW))) {
+      uint8_t oldx = pointerx;
+      uint8_t oldy = pointery;
+      pointerx-=1;
+      if(pointerx <0) pointerx = 8; 
+      updatePointer(oldx,oldy);
+    }
+    
+    if (get_switch_press(_BV(SWC))) {
+      if(checkSolved()){
+        break;
+      } else {
+        fillGridBackground(RED);
+        drawPuzzle();
+        drawPointer();
+      }
+    }
+  }
+  fillBackground(GREEN);
+  drawPuzzle();
+  return ;
+}
+
+void drawPointer(){
+  fillBoxOutline(pointerx,pointery,theme.cursor_border);
+}
+
+void fillBackground(uint16_t col){
+  rectangle rect;
+  rect.left = 0;
+  rect.right = LCDHEIGHT;
+  rect.top = 0;
+  rect.bottom = LCDWIDTH;
+  fill_rectangle(rect,col);
+}
+
+//Used to show red briefly for incorrect solution
+void fillGridBackground(uint16_t col){
+  rectangle rect;
+  rect.left = TOPLEFTX;
+  rect.right = TOPLEFTX+(9*(CELLSIZE+1))+2;
+  rect.top = TOPLEFTY;
+  rect.bottom = TOPLEFTY + (9*(CELLSIZE+1))+2;
+  fill_rectangle(rect,col);
 }
 
 void drawPuzzle(){
+  uint8_t i;
+  uint8_t j;
   
-  //Background Square
-  struct rectangle rect;
+  /* Background Square */
+  rectangle rect;
   rect.left = TOPLEFTX;
-  rect.right = TOPLEFTX+91;
+  rect.right = TOPLEFTX+(9*(CELLSIZE+1))+2;
   rect.top = TOPLEFTY;
-  rect.bottom = TOPLEFTY + 91;
-  fill_rectangle(rect,BLACK)
+  rect.bottom = TOPLEFTY + (9*(CELLSIZE+1))+2;
+  fill_rectangle(rect,theme.cell_frame);
   
-  for(int i =0;i<9;i++){
-    for(int j=0;j<9;j++){
+  for(i=0;i<9;i++){
+    for(j=0;j<9;j++){
       
-        //Number white box
-        rect.left = getBoxX(i);
-        rect.right = rect.left + 8;
-        rect.top = getBoxY(j);
-        rect.bottom = rect.top + 8;
-        fill_rectangle(rect,WHITE);
+        /* Number Cells */
+        rect.left = getCellX(i);
+        rect.right = rect.left + CELLSIZE-1;
+        rect.top = getCellY(j);
+        rect.bottom = rect.top +CELLSIZE-1;
+        fill_rectangle(rect,theme.cell_background);
         
-        //Number
-        if(boolMatrix[i][j]){
-          char buffer[2];
-          itoa(numberMatrix[i][j],buffer);
-          display_string_xy(buffer, (getBoxX(i) + 2 ), (getBoxY(i)+1));
-        }
+        /* Number */
+        if(numberMatrix[j][i]){
+          
+          if(boolMatrix[j][i]){
+            display_color(theme.noneditable_numbers,theme.cell_background);
+            char buffer[1];
+            itoa(numberMatrix[j][i],buffer,10);
+            display_string_xy(buffer, (getCellX(i) + (CELLSIZE/2)-2), (getCellY(j)+((CELLSIZE/2)-3)));
+          } else {
+            display_color(theme.editable_numbers,theme.cell_background);
+            char buffer[1];
+            itoa(numberMatrix[j][i],buffer,10);
+            display_string_xy(buffer, (getCellX(i) + (CELLSIZE/2)-2), (getCellY(j)+((CELLSIZE/2)-3)));
+            
+          }
+      }
     }
   }
-  
-  
-  
 }
+
+void fillCell(uint8_t x,uint8_t y, uint16_t col){
+  rectangle rect;
+  rect.left = getCellX(x);
+  rect.right = rect.left + CELLSIZE-1;
+  rect.top = getCellY(y);
+  rect.bottom = rect.top +CELLSIZE-1;
+  fill_rectangle(rect,col);
+}
+
+void drawNumber(uint8_t x,uint8_t y, uint8_t number){
+  char buffer[1];
+  itoa(number,buffer,10);
+  display_string_xy(buffer, (getCellX(x) + (CELLSIZE/2)-2), (getCellY(y)+((CELLSIZE/2)-3)));
+}
+
+void updatePointer(uint8_t oldx,uint8_t oldy){
+  fillBoxOutline(oldx,oldy, theme.cell_frame);
+  fillBoxOutline(pointerx,pointery,theme.cursor_border);
+}
+
+void fillBoxOutline(uint8_t x, uint8_t y, uint16_t col){
+  rectangle rect;
+  
+  /*return outline of old box to theme.cell_frame*/
+  /* Left wall */
+  rect.left = getBoxX(x);
+  rect.right = rect.left;
+  rect.top = getBoxY(y);
+  rect.bottom = rect.top + CELLSIZE + 1;
+  fill_rectangle(rect,col);
+  
+  /* Right wall */
+  rect.left = getBoxX(x) + CELLSIZE + 1;
+  rect.right = rect.left;
+  rect.top = getBoxY(y);
+  rect.bottom = rect.top + CELLSIZE + 1;
+  fill_rectangle(rect,col);
+  
+  /* Top wall */
+  rect.left = getBoxX(x);
+  rect.right = rect.left + CELLSIZE + 1;
+  rect.top = getBoxY(y);
+  rect.bottom = rect.top;
+  fill_rectangle(rect,col);
+      
+  /* Bottom wall */
+  rect.left = getBoxX(x);
+  rect.right = rect.left + CELLSIZE + 1;
+  rect.top = getBoxY(y) + CELLSIZE + 1;
+  rect.bottom = rect.top;
+  fill_rectangle(rect,col);
+}  
 
 uint8_t getBoxX(uint8_t i){
-  return TOPLEFTX + (10*i) + 1;
+  return TOPLEFTX + (i*(CELLSIZE+1)) + ((uint8_t) (i/3));
+}
+ 
+uint8_t getBoxY(uint8_t i){
+  return TOPLEFTY + (i*(CELLSIZE+1))+ ((uint8_t) (i/3));
+}
+  
+uint8_t getCellX(uint8_t i){
+  return getBoxX(i) + 1;
 }
 
-uint8_t getBoxY(uint8_t j){
-  return TOPLEFTY + (10*j) + 1;
+uint8_t getCellY(uint8_t i){
+  return getBoxY(i) + 1;
 }
 
 uint8_t checkSolved(){
   uint8_t set[9];
+  uint8_t arr[3][3][9];
+  
+  uint8_t i;
+  uint8_t j;
 
-  //Checks all rows & columns
-  for(int i =0;i<9;i++){
+  /* Checks all rows & columns */
+  for(i =0;i<9;i++){
     if(!checkSet(numberMatrix[i])){ return 0;}    
-    for(int j = 0;j<9;j++){
+    for(j = 0;j<9;j++){
       set[j] = numberMatrix[j][i];
     } 
     if(!checkSet(set)){ return 0;}
   }
 
-  //Checks each square 
-  // TODO: Not do it this way
-  for(int i = 0;i<3;i++){
-    for(int j = 0;j<3;j++){
-      for(int k =0;k<3;k++{
-        for(int l =0;l<3;l++{
-          set[k+l]=numberMatrix[(3*i)+k][(3*j)+l];
-        }
-      }
-      if(!checkSet(set)){ return 0;}
+  /* Checks each 3*3 square */
+  /* I have no idea how I managed to make this code but its great */
+
+  for(i=0;i<9;i++){
+    for(j=0;j<9;j++){
+      arr[i/3][j/3][(3*(i%3))+(j%3)] = numberMatrix[i][j];
     }
   }
+  
+  for(i=0;i<3;i++){
+    for(j=0;j<3;j++){
+        if(!checkSet(arr[i][j])){return 0;}
+      } 
+    }  
+  return 1;
 }
 
 uint8_t checkSet(uint8_t set[9]){
   uint8_t sum = 0;
-  for(int i=0;i<9;i++){
+  uint8_t i;
+  uint8_t j;
+  for(i=0;i<9;i++){
     sum += set[i];
   }
   if(sum != 45) {return 0;}
-  for(int i=0;i<8;i++){
-    for(int j=i+1;j<9;j++){
+  for(i=0;i<8;i++){
+    for(j=i+1;j<9;j++){
       if(set[j] == set[i]) {return 0;}
     }
   }
