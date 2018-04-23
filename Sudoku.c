@@ -8,7 +8,10 @@
 #define CELLSIZE 23 /*Odd number means text aligned in centre, should be > 7 */
 #define TOPLEFTX (LCDHEIGHT/2) - ((9*(CELLSIZE+1))/2)
 #define TOPLEFTY (LCDWIDTH/2) - ((9*(CELLSIZE+1))/2)
+#define PUZZLE_HARDCODED 0
+#define MAX_MISSING_NUMBERS 20 /* In order to set difficulty or reduce load time */
 
+/* drawing methods */
 void drawPuzzle();
 void drawPointer();
 void updatePointer(uint8_t oldx,uint8_t oldy);
@@ -17,12 +20,20 @@ void fillCell(uint8_t x,uint8_t y, uint16_t col);
 void fillBackground(uint16_t col);
 void fillGridBackground(uint16_t col);
 void drawNumber(uint8_t x,uint8_t y, uint8_t number);
+
+/* coordinate methods */
 uint8_t getBoxX(uint8_t i);
 uint8_t getBoxY(uint8_t i);
 uint8_t getCellX(uint8_t i);
 uint8_t getCellY(uint8_t j);
+
+/* solution checking methods */
 uint8_t checkSolved();
 uint8_t checkSet(uint8_t set[9]);
+uint8_t checkSquare(uint8_t x, uint8_t y, int a);
+uint8_t checkRowandColumn(uint8_t x, uint8_t y, int a);
+uint8_t solveSudoku(uint32_t breakAt, uint8_t fillPuzzle);
+void generatePuzzle();
 
 volatile int8_t pointerx =0;
 volatile int8_t pointery =0;
@@ -40,7 +51,7 @@ struct Theme theme = defaulttheme;
   {4,6,1,3,5,7,9,8,2}
 */
 
-volatile int8_t numberMatrix[9][9]= {
+int8_t numberMatrix[9][9]= {
   {1,5,0,6,3,0,0,7,9},
   {6,0,0,7,0,1,0,0,0},
   {0,0,7,2,8,0,0,3,1},
@@ -50,10 +61,23 @@ volatile int8_t numberMatrix[9][9]= {
   {2,7,0,0,6,9,3,0,0},
   {0,0,0,1,0,8,0,0,6},
   {4,6,0,0,5,7,0,8,2}
+    
+};
+
+int8_t blankMatrix[9][9]= {
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0}
 };
 
 /*Any non 0's are editable by the player.*/
-uint8_t boolMatrix[9][9] =
+int8_t boolMatrix[9][9] =
 {
   {1,5,0,6,3,0,0,7,9},
   {6,0,0,7,0,1,0,0,0},
@@ -68,20 +92,26 @@ uint8_t boolMatrix[9][9] =
 };
 
 int main(){
-  rectangle rect;
+  TCCR2B |= (1<<CS10); /* timer used for random seed (As in FortunaTetris) */
   init_lcd();
   set_orientation(West);
-  //init_rotary();
-
+  
+  if(!PUZZLE_HARDCODED){
+    generatePuzzle();
+   }
+   
   fillBackground(theme.background);
   drawPuzzle();
   drawPointer();
+  
   os_init_ruota();
+  
   for(;;){
+    
     scan_encoder();
+    
     int delta = os_enc_delta();
     if(delta){
-       // drawPuzzle();
       if(!boolMatrix[pointery][pointerx]){
         numberMatrix[pointery][pointerx] += delta;
         if(numberMatrix[pointery][pointerx]<0) numberMatrix[pointery][pointerx] = 9;
@@ -95,7 +125,6 @@ int main(){
         }
       }
     }
-    
     
     scan_switches();
     if (get_switch_press(_BV(SWS))) {
@@ -144,6 +173,113 @@ int main(){
   return ;
 }
 
+/* Used to either populate and solve the puzzle or find the number of solutions
+   Uses numberMatrix as the sudoku puzzle to solve #
+   In order to be efficient, can set to stop at a certain threshold of found solutions*/
+uint8_t solveSudoku(uint32_t breakAt,uint8_t fillPuzzle){
+  uint8_t i;
+  uint8_t j;
+  uint8_t k;
+  uint8_t a;
+  uint32_t b = 0;
+  uint32_t numSolutions = 0;
+
+  
+  srand(TCNT2); /* random seed (from timer) */
+  for(i=0;i<9;i++){
+    for(j=0;j<9;j++){
+      /* if square is already full, try next square */
+      if(!numberMatrix[i][j]){
+        
+        k = (uint8_t) (rand()%9) + 1; /*Allows for different random sudoku grids to be generated*/
+        for(a=k;a<k+9;a++) {
+          if(checkSquare(i,j,(a%9)+1) && checkRowandColumn(i,j,(a%9)+1)){
+            numberMatrix[i][j] = (a%9)+1;
+            b = solveSudoku((breakAt - numSolutions),fillPuzzle);
+
+            if(b){
+              numSolutions += b;
+              if(numSolutions >= breakAt){
+                if(!fillPuzzle) numberMatrix[i][j] = 0;
+                return numSolutions;
+              }
+            }
+
+          }
+        }
+        numberMatrix[i][j] = 0;
+        return numSolutions;
+      }
+    } 
+  }
+  return 1;  
+}
+
+void generatePuzzle(){
+
+  int i;
+  int j;
+  int ran1;
+  int ran2;
+  int oldvalue;
+  int count = 0;
+
+  /*Sets the puzzle to empty, overriding any hardcoded numbers */
+  for(i=0;i<9;i++){
+    for(j=0;j<9;j++){
+      numberMatrix[i][j] = 0;
+    }
+  }
+   /* Populates grid with a random (complete) sudoku by solving the empty one */
+   
+  solveSudoku(1,1);
+
+  /* Removes random numbers until we either reach MAX_MISSING_NUMBERS or removing
+  the next random number would cause puzzle to have 2 solved states */
+  while(solveSudoku(2,0)==1){
+    if(count > MAX_MISSING_NUMBERS ) break;
+    ran1 = (rand()%9);
+    ran2 = (rand()%9);
+    if(numberMatrix[ran1][ran2]){
+      oldvalue = numberMatrix[ran1][ran2];
+      numberMatrix[ran2][ran1] = 0;
+      count++;
+    }
+  }
+  numberMatrix[ran1][ran2] = oldvalue;
+
+  /* populates the boolMatrix with our now complete puzzle */
+  for(i=0;i<9;i++){
+    for(j=0;j<9;j++){
+      boolMatrix[i][j] = numberMatrix[i][j];
+    }
+  }
+    
+}
+
+uint8_t checkSquare(uint8_t x, uint8_t y, int a){
+  uint8_t i;
+  uint8_t j;
+  uint8_t subsquarex = (x/3);
+  uint8_t subsquarey = (y/3);
+  
+  for(i=0;i<3;i++){
+    for(j=0;j<3;j++){
+      if(numberMatrix[(3*subsquarex)+i][(3*subsquarey)+j]==a) return 0;
+    }
+  }
+  return 1;
+}
+
+uint8_t checkRowandColumn(uint8_t x, uint8_t y, int a){
+  uint8_t i;
+  for(i=0;i<9;i++){
+      if(numberMatrix[i][y]==a) return 0;
+      if(numberMatrix[x][i]==a) return 0;
+  }
+  return 1;
+}
+  
 void drawPointer(){
   fillBoxOutline(pointerx,pointery,theme.cursor_border);
 }
