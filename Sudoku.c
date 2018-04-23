@@ -9,7 +9,7 @@
 #define TOPLEFTX (LCDHEIGHT/2) - ((9*(CELLSIZE+1))/2)
 #define TOPLEFTY (LCDWIDTH/2) - ((9*(CELLSIZE+1))/2)
 #define PUZZLE_HARDCODED 0
-#define MAX_MISSING_NUMBERS 20 /* In order to set difficulty or reduce load time */
+#define MAX_MISSING_NUMBERS 40 /* In order to set difficulty or reduce load time */
 
 /* drawing methods */
 void drawPuzzle();
@@ -37,7 +37,7 @@ void generatePuzzle();
 
 volatile int8_t pointerx =0;
 volatile int8_t pointery =0;
-struct Theme theme = defaulttheme;
+struct Theme theme = pinktheme;
 
 /*    SOLVED GRID
   {1,5,2,6,3,4,8,7,9},
