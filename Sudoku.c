@@ -37,7 +37,7 @@ void generatePuzzle();
 
 volatile int8_t pointerx =0;
 volatile int8_t pointery =0;
-struct Theme theme = pinktheme;
+struct Theme theme = cutetheme;
 
 /*    SOLVED GRID
   {1,5,2,6,3,4,8,7,9},
