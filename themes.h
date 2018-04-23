@@ -9,4 +9,4 @@ struct Theme{
 };
 
 #define defaulttheme {BLACK      , YELLOW     , WHITE_SMOKE, BLACK, RED, DARK_GREEN}
-#define cutetheme {PINK, PURPLE, PEACH_PUFF, DARK_RED, RED}
+#define cutetheme {PINK, DEEP_PINK, PEACH_PUFF, FUSCIA, GREEN, TURQUOISE}
