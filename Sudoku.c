@@ -1,6 +1,7 @@
 #include <avr/io.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <avr/eeprom.h>
 #include "lcd.h"
 #include "ruota.h"
 #include "themes.h"
@@ -9,7 +10,8 @@
 #define TOPLEFTX (LCDHEIGHT/2) - ((9*(CELLSIZE+1))/2)
 #define TOPLEFTY (LCDWIDTH/2) - ((9*(CELLSIZE+1))/2)
 #define PUZZLE_HARDCODED 0
-#define MAX_MISSING_NUMBERS 40 /* In order to set difficulty or reduce load time */
+#define MAX_MISSING_NUMBERS 81 /* In order to set difficulty or reduce load time */
+#define MIN_MISSING NUMBERS 0 
 
 /* drawing methods */
 void drawPuzzle();
@@ -33,11 +35,14 @@ uint8_t checkSet(uint8_t set[9]);
 uint8_t checkSquare(uint8_t x, uint8_t y, int a);
 uint8_t checkRowandColumn(uint8_t x, uint8_t y, int a);
 uint8_t solveSudoku(uint32_t breakAt, uint8_t fillPuzzle);
+uint8_t randomSolveSudoku(uint32_t breakAt,uint8_t fillPuzzle);
 void generatePuzzle();
 
 volatile int8_t pointerx =0;
 volatile int8_t pointery =0;
-struct Theme theme = cutetheme;
+struct Theme theme = defaulttheme;
+
+uint16_t EEMEM eepromseed = 0;
 
 /*    SOLVED GRID
   {1,5,2,6,3,4,8,7,9},
@@ -91,15 +96,26 @@ int8_t boolMatrix[9][9] =
     
 };
 
-int main(){
-  TCCR2B |= (1<<CS10); /* timer used for random seed (As in FortunaTetris) */
+int main(){ 
+  int kpr = CLKPR;
+  CLKPR = (1 << CLKPCE);
+  CLKPR = 0;
+  uint16_t seed = eeprom_read_word(&eepromseed);
+  eeprom_write_word(&eepromseed, seed + 1);
+  srand(seed); /* by using the eeprom, I can get a different seed each time */
+
   init_lcd();
+  
   set_orientation(West);
   
   if(!PUZZLE_HARDCODED){
+
     generatePuzzle();
+
    }
    
+  CLKPR = (1 << CLKPCE);
+  CLKPR = kpr;
   fillBackground(theme.background);
   drawPuzzle();
   drawPointer();
@@ -174,8 +190,46 @@ int main(){
 }
 
 /* Used to either populate and solve the puzzle or find the number of solutions
-   Uses numberMatrix as the sudoku puzzle to solve #
+   Uses numberMatrix as the sudoku puzzle to solve
    In order to be efficient, can set to stop at a certain threshold of found solutions*/
+uint8_t randomSolveSudoku(uint32_t breakAt,uint8_t fillPuzzle){
+  uint8_t i;
+  uint8_t j;
+  uint8_t k;
+  uint8_t a;
+  uint32_t b = 0;
+  uint32_t numSolutions = 0;
+
+  
+  for(i=0;i<9;i++){
+    for(j=0;j<9;j++){
+      /* if square is already full, try next square */
+      if(!numberMatrix[i][j]){
+        
+        k = (uint8_t) (rand()%9) + 1; /*Allows for different random sudoku grids to be generated*/
+        for(a=k;a<k+9;a++) {
+          if(checkRowandColumn(i,j,(a%9)+1) && checkSquare(i,j,(a%9)+1)){
+            numberMatrix[i][j] = (a%9)+1;
+            b = solveSudoku((breakAt - numSolutions),fillPuzzle);
+
+            if(b){
+              numSolutions += b;
+              if(numSolutions >= breakAt){
+                if(!fillPuzzle) numberMatrix[i][j] = 0;
+                return numSolutions;
+              }
+            }
+
+          }
+        }
+        numberMatrix[i][j] = 0;
+        return numSolutions;
+      }
+    } 
+  }
+  return 1;  
+}
+
 uint8_t solveSudoku(uint32_t breakAt,uint8_t fillPuzzle){
   uint8_t i;
   uint8_t j;
@@ -185,7 +239,6 @@ uint8_t solveSudoku(uint32_t breakAt,uint8_t fillPuzzle){
   uint32_t numSolutions = 0;
 
   
-  srand(TCNT2); /* random seed (from timer) */
   for(i=0;i<9;i++){
     for(j=0;j<9;j++){
       /* if square is already full, try next square */
@@ -193,7 +246,7 @@ uint8_t solveSudoku(uint32_t breakAt,uint8_t fillPuzzle){
         
         k = (uint8_t) (rand()%9) + 1; /*Allows for different random sudoku grids to be generated*/
         for(a=k;a<k+9;a++) {
-          if(checkSquare(i,j,(a%9)+1) && checkRowandColumn(i,j,(a%9)+1)){
+          if(checkRowandColumn(i,j,(a%9)+1) && checkSquare(i,j,(a%9)+1)){
             numberMatrix[i][j] = (a%9)+1;
             b = solveSudoku((breakAt - numSolutions),fillPuzzle);
 
@@ -230,23 +283,26 @@ void generatePuzzle(){
       numberMatrix[i][j] = 0;
     }
   }
-   /* Populates grid with a random (complete) sudoku by solving the empty one */
-   
-  solveSudoku(1,1);
+  
+  /* Populates grid with a random (complete) sudoku by solving the empty one */
+  randomSolveSudoku(1,1);
 
   /* Removes random numbers until we either reach MAX_MISSING_NUMBERS or removing
   the next random number would cause puzzle to have 2 solved states */
-  while(solveSudoku(2,0)==1){
-    if(count > MAX_MISSING_NUMBERS ) break;
-    ran1 = (rand()%9);
-    ran2 = (rand()%9);
-    if(numberMatrix[ran1][ran2]){
-      oldvalue = numberMatrix[ran1][ran2];
-      numberMatrix[ran2][ran1] = 0;
-      count++;
+  while(count < MIN_MISSING_NUMBERS){
+    while(solveSudoku(2,0)==1){
+      if(count > MAX_MISSING_NUMBERS ) break;
+      ran1 = (rand()%9);
+      ran2 = (rand()%9);
+      if(numberMatrix[ran1][ran2]){
+        oldvalue = numberMatrix[ran1][ran2];
+        numberMatrix[ran2][ran1] = 0;
+        count++;
+      }
     }
+    numberMatrix[ran1][ran2] = oldvalue;
+    count--;
   }
-  numberMatrix[ran1][ran2] = oldvalue;
 
   /* populates the boolMatrix with our now complete puzzle */
   for(i=0;i<9;i++){
