@@ -16,6 +16,8 @@
 #define MIN_MISSING_NUMBERS 48
 
 /* drawing methods */
+void drawMenu(int selected);
+void drawMenuBoxOutline(int box,uint16_t col);
 void drawPuzzle();
 void drawPointer();
 void updatePointer(uint8_t oldx,uint8_t oldy);
@@ -44,7 +46,9 @@ volatile int8_t pointerx =0;
 volatile int8_t pointery =0;
 struct Theme theme = defaulttheme;
 
-uint16_t EEMEM eepromseed = 0;
+uint16_t EEMEM eepromseed;
+int8_t EEMEM storedMatrix[9][9];
+int8_t EEMEM storedboolMatrix[9][9];
 
 /*    SOLVED GRID
   {1,5,2,6,3,4,8,7,9},
@@ -58,6 +62,18 @@ uint16_t EEMEM eepromseed = 0;
   {4,6,1,3,5,7,9,8,2}
 */
 
+/*int8_t blankMatrix[9][9]= {
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0}
+};*/
+
 int8_t numberMatrix[9][9]= {
   {1,5,0,6,3,0,0,7,9},
   {6,0,0,7,0,1,0,0,0},
@@ -69,18 +85,6 @@ int8_t numberMatrix[9][9]= {
   {0,0,0,1,0,8,0,0,6},
   {4,6,0,0,5,7,0,8,2}
     
-};
-
-int8_t blankMatrix[9][9]= {
-  {0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0}
 };
 
 /*Any non 0's are editable by the player.*/
@@ -98,11 +102,12 @@ int8_t boolMatrix[9][9] =
     
 };
 
+
 int main(){ 
 
-  int kpr = CLKPR;
-  CLKPR = (1 << CLKPCE);
-  CLKPR = 0;
+  int8_t selected;
+  int8_t currentTheme;
+  currentTheme = 0;
   
   uint16_t seed = eeprom_read_word(&eepromseed);
   eeprom_write_word(&eepromseed, seed + 1);
@@ -110,18 +115,60 @@ int main(){
 
   init_lcd();
   set_orientation(West);
+  os_init_ruota();
   
-  if(!PUZZLE_HARDCODED){
-    generatePuzzle();
+  selected = 0;
+  drawMenu(selected);
+  for(;;){
+    scan_switches();
+    
+    if (get_switch_press(_BV(SWS))) {
+      drawMenuBoxOutline(selected,theme.cell_frame);
+      selected++;
+      selected = selected%3;
+      drawMenuBoxOutline(selected,theme.cursor_border);
+    }
+    
+    if (get_switch_press(_BV(SWN))) {
+      drawMenuBoxOutline(selected,theme.cell_frame);
+      selected--;
+      if(selected<0){
+        selected = 2;
+      }
+      drawMenuBoxOutline(selected,theme.cursor_border);
+    }
+    
+    if (get_switch_press(_BV(SWC))) {
+      if(!selected){
+        if(!PUZZLE_HARDCODED){
+          generatePuzzle();
+        }
+        break;
+      } else if (selected == 1){        
+        eeprom_read_block((void*)numberMatrix, (const void*)storedMatrix, 81*sizeof(selected));
+        if(numberMatrix[0][0] != -1){
+          eeprom_read_block((void*)boolMatrix, (const void*)storedboolMatrix, 81*sizeof(selected));
+          break;
+        } else {
+          display_string_xy("No save data to load.",LCDHEIGHT/2-60,LCDWIDTH/2);
+        }
+
+      } else {
+        currentTheme++;
+        currentTheme = currentTheme % NUM_THEMES ;
+        theme = themeList[currentTheme];
+        drawMenu(selected);
+      }
+    }
+    
   }
-   
-  CLKPR = (1 << CLKPCE);
-  CLKPR = kpr;
- // fillBackground(theme.background);
+  
+
+  fillBackground(theme.background);
   drawPuzzle();
   drawPointer();
   
-  os_init_ruota();
+
   
   for(;;){
     
@@ -182,12 +229,83 @@ int main(){
         fillGridBackground(RED);
         drawPuzzle();
         drawPointer();
+        eeprom_update_block((void*)numberMatrix, (const void*)storedMatrix, 81*sizeof(selected));
+        eeprom_update_block((void*)boolMatrix, (const void*)storedboolMatrix, 81*sizeof(selected));
+
       }
     }
   }
   fillBackground(GREEN);
   drawPuzzle();
-  return ;
+  display_color(theme.editable_numbers,LIME_GREEN);
+  display_string_xy("Congratulations! You have completed this Sudoku!",LCDHEIGHT/2-48*6,LCDWIDTH/2);
+  return 0;
+}
+
+void drawMenuBoxOutline(int box, uint16_t col){
+  rectangle rect;
+  rect.top = 89 + 45*box;
+  rect.bottom = rect.top;
+  rect.left = LCDHEIGHT/2 - 76;
+  rect.right = LCDHEIGHT/2 + 76;
+  fill_rectangle(rect, col);
+  
+  rect.top+= 27;
+  rect.bottom = rect.top;
+  fill_rectangle(rect, col);
+
+  rect.right = rect.left;
+  rect.top -=27;
+  fill_rectangle(rect, col);
+  
+  rect.right = LCDHEIGHT/2 + 76;
+  rect.left = rect.right;
+  fill_rectangle(rect, col);
+  
+}
+
+void drawMenu(int selected){
+  uint8_t x;
+  uint8_t y;
+  
+  x = LCDHEIGHT/2 - (5.5*6);
+  y = 40;
+  fillBackground(theme.background);
+  fillGridBackground(theme.cell_frame);
+  display_color(theme.noneditable_numbers,theme.cell_frame);
+  display_string_xy("S U D O K U",x,y);
+  
+  rectangle rect;
+  rect.top = 89 + 45*selected;
+  rect.bottom = rect.top + 27;
+  rect.left = LCDHEIGHT/2 - 76;
+  rect.right = LCDHEIGHT/2 + 76;
+  fill_rectangle(rect, theme.cursor_border);
+  
+  
+  rect.left = LCDHEIGHT/2 - 75;
+  rect.right = LCDHEIGHT/2 + 75;
+  display_color(theme.editable_numbers,theme.cell_background);
+
+  
+  rect.top = 90;
+  rect.bottom = 115;
+  fill_rectangle(rect, theme.cell_background);
+  display_string_xy("New Game",LCDHEIGHT/2 - (8/2)*6,rect.top+9);
+
+  rect.top = 135;
+  rect.bottom = 160;
+  fill_rectangle(rect, theme.cell_background);
+  display_string_xy("Load Game",LCDHEIGHT/2 - 27,rect.top+9);
+
+  
+  rect.top = 180;
+  rect.bottom = 205;
+  fill_rectangle(rect, theme.cell_background);
+  display_string_xy("Theme",LCDHEIGHT/2 - 15,rect.top+9);
+
+    
+
 }
 
 /* Used to either populate and solve the puzzle or find the number of solutions
@@ -276,8 +394,18 @@ void generatePuzzle(){
   int ran1;
   int ran2;
   int oldvalue;
+  int kpr;
   uint16_t count;
+  
+  
+  kpr = CLKPR;
+  CLKPR = (1 << CLKPCE);
+  CLKPR = 0;
 
+  fillBackground(theme.background);
+  display_string_xy("Generating a Sudoku puzzle...",LCDHEIGHT/2-16*6,LCDWIDTH/2);
+
+  
   /*Sets the puzzle to empty, overriding any hardcoded numbers */
   for(i=0;i<9;i++){
     for(j=0;j<9;j++){
@@ -314,6 +442,11 @@ void generatePuzzle(){
       boolMatrix[i][j] = numberMatrix[i][j];
     }
   }
+  
+  
+   
+  CLKPR = (1 << CLKPCE);
+  CLKPR = kpr;
     
 }
 
