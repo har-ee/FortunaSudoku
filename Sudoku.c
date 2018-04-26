@@ -10,8 +10,10 @@
 #define TOPLEFTX (LCDHEIGHT/2) - ((9*(CELLSIZE+1))/2)
 #define TOPLEFTY (LCDWIDTH/2) - ((9*(CELLSIZE+1))/2)
 #define PUZZLE_HARDCODED 0
-#define MAX_MISSING_NUMBERS 81 /* In order to set difficulty or reduce load time */
-#define MIN_MISSING NUMBERS 0 
+
+/* In order to set difficulty or reduce load time */
+#define MAX_MISSING_NUMBERS 81
+#define MIN_MISSING_NUMBERS 48
 
 /* drawing methods */
 void drawPuzzle();
@@ -97,26 +99,25 @@ int8_t boolMatrix[9][9] =
 };
 
 int main(){ 
+
   int kpr = CLKPR;
   CLKPR = (1 << CLKPCE);
   CLKPR = 0;
+  
   uint16_t seed = eeprom_read_word(&eepromseed);
   eeprom_write_word(&eepromseed, seed + 1);
   srand(seed); /* by using the eeprom, I can get a different seed each time */
 
   init_lcd();
-  
   set_orientation(West);
   
   if(!PUZZLE_HARDCODED){
-
     generatePuzzle();
-
-   }
+  }
    
   CLKPR = (1 << CLKPCE);
   CLKPR = kpr;
-  fillBackground(theme.background);
+ // fillBackground(theme.background);
   drawPuzzle();
   drawPointer();
   
@@ -275,7 +276,7 @@ void generatePuzzle(){
   int ran1;
   int ran2;
   int oldvalue;
-  int count = 0;
+  uint16_t count;
 
   /*Sets the puzzle to empty, overriding any hardcoded numbers */
   for(i=0;i<9;i++){
@@ -287,21 +288,24 @@ void generatePuzzle(){
   /* Populates grid with a random (complete) sudoku by solving the empty one */
   randomSolveSudoku(1,1);
 
+  count = 0;
   /* Removes random numbers until we either reach MAX_MISSING_NUMBERS or removing
   the next random number would cause puzzle to have 2 solved states */
-  while(count < MIN_MISSING_NUMBERS){
-    while(solveSudoku(2,0)==1){
-      if(count > MAX_MISSING_NUMBERS ) break;
-      ran1 = (rand()%9);
-      ran2 = (rand()%9);
-      if(numberMatrix[ran1][ran2]){
-        oldvalue = numberMatrix[ran1][ran2];
-        numberMatrix[ran2][ran1] = 0;
+  for(;;){
+
+    ran1 = (rand()%9);
+    ran2 = (rand()%9);
+    if(numberMatrix[ran1][ran2]){
+      oldvalue = numberMatrix[ran1][ran2];
+      numberMatrix[ran1][ran2] = 0;
+      if(solveSudoku(2,0)==1){
         count++;
+      } else {
+        numberMatrix[ran1][ran2] = oldvalue;
+        if(count >= MIN_MISSING_NUMBERS) break;
       }
     }
-    numberMatrix[ran1][ran2] = oldvalue;
-    count--;
+    if(count >= MAX_MISSING_NUMBERS) break;
   }
 
   /* populates the boolMatrix with our now complete puzzle */
