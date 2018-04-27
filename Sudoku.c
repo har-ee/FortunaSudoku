@@ -6,7 +6,7 @@
 #include "ruota.h"
 #include "themes.h"
 
-#define CELLSIZE 23 /*Odd number means text aligned in centre, should be > 7 */
+#define CELLSIZE 25 /*Odd number means text aligned in centre, should be > 7 */
 #define TOPLEFTX (LCDHEIGHT/2) - ((9*(CELLSIZE+1))/2)
 #define TOPLEFTY (LCDWIDTH/2) - ((9*(CELLSIZE+1))/2)
 #define PUZZLE_HARDCODED 0
@@ -42,8 +42,11 @@ uint8_t solveSudoku(uint32_t breakAt, uint8_t fillPuzzle);
 uint8_t randomSolveSudoku(uint32_t breakAt,uint8_t fillPuzzle);
 void generatePuzzle();
 
-volatile int8_t pointerx =0;
-volatile int8_t pointery =0;
+void menu();
+void runGame();
+
+int8_t pointerx =0;
+int8_t pointery =0;
 struct Theme theme = defaulttheme;
 
 uint16_t EEMEM eepromseed;
@@ -104,10 +107,6 @@ int8_t boolMatrix[9][9] =
 
 
 int main(){ 
-
-  int8_t selected;
-  int8_t currentTheme;
-  currentTheme = 0;
   
   uint16_t seed = eeprom_read_word(&eepromseed);
   eeprom_write_word(&eepromseed, seed + 1);
@@ -117,59 +116,16 @@ int main(){
   set_orientation(West);
   os_init_ruota();
   
-  selected = 0;
-  drawMenu(selected);
-  for(;;){
-    scan_switches();
-    
-    if (get_switch_press(_BV(SWS))) {
-      drawMenuBoxOutline(selected,theme.cell_frame);
-      selected++;
-      selected = selected%3;
-      drawMenuBoxOutline(selected,theme.cursor_border);
-    }
-    
-    if (get_switch_press(_BV(SWN))) {
-      drawMenuBoxOutline(selected,theme.cell_frame);
-      selected--;
-      if(selected<0){
-        selected = 2;
-      }
-      drawMenuBoxOutline(selected,theme.cursor_border);
-    }
-    
-    if (get_switch_press(_BV(SWC))) {
-      if(!selected){
-        if(!PUZZLE_HARDCODED){
-          generatePuzzle();
-        }
-        break;
-      } else if (selected == 1){        
-        eeprom_read_block((void*)numberMatrix, (const void*)storedMatrix, 81*sizeof(selected));
-        if(numberMatrix[0][0] != -1){
-          eeprom_read_block((void*)boolMatrix, (const void*)storedboolMatrix, 81*sizeof(selected));
-          break;
-        } else {
-          display_string_xy("No save data to load.",LCDHEIGHT/2-60,LCDWIDTH/2);
-        }
+  menu();
 
-      } else {
-        currentTheme++;
-        currentTheme = currentTheme % NUM_THEMES ;
-        theme = themeList[currentTheme];
-        drawMenu(selected);
-      }
-    }
-    
-  }
+  return 0;
+}
+
+void runGame(){
   
-
   fillBackground(theme.background);
   drawPuzzle();
   drawPointer();
-  
-
-  
   for(;;){
     
     scan_encoder();
@@ -227,10 +183,15 @@ int main(){
         break;
       } else {
         fillGridBackground(RED);
+        display_color(WHITE,RED);
+        display_string_xy("Incorrect solution, but progress saved!",LCDHEIGHT/2-114,LCDWIDTH -9);
+        eeprom_update_block((void*)numberMatrix, (const void*)storedMatrix, 81*sizeof(int8_t));
+        eeprom_update_block((void*)boolMatrix, (const void*)storedboolMatrix, 81*sizeof(int8_t));
+        fillGridBackground(RED);
+        display_string_xy("Incorrect solution, but progress saved!",LCDHEIGHT/2-114,LCDWIDTH -9);
         drawPuzzle();
         drawPointer();
-        eeprom_update_block((void*)numberMatrix, (const void*)storedMatrix, 81*sizeof(selected));
-        eeprom_update_block((void*)boolMatrix, (const void*)storedboolMatrix, 81*sizeof(selected));
+
 
       }
     }
@@ -238,8 +199,67 @@ int main(){
   fillBackground(GREEN);
   drawPuzzle();
   display_color(theme.editable_numbers,LIME_GREEN);
-  display_string_xy("Congratulations! You have completed this Sudoku!",LCDHEIGHT/2-48*6,LCDWIDTH/2);
-  return 0;
+  display_string_xy("Congratulations! You have completed this Sudoku!",LCDHEIGHT/2-24*6,LCDWIDTH/2);
+  for(;;){
+    scan_switches();
+    if (get_switch_press(_BV(SWC))) {
+      break;
+    }
+  }
+}
+
+void menu(){
+  int8_t currentTheme;
+  currentTheme = 0;
+
+  int8_t selected;
+  selected = 0;
+  drawMenu(selected);
+  for(;;){
+    scan_switches();
+    
+    if (get_switch_press(_BV(SWS))) {
+      drawMenuBoxOutline(selected,theme.cell_frame);
+      selected++;
+      selected = selected%3;
+      drawMenuBoxOutline(selected,theme.cursor_border);
+    }
+    
+    if (get_switch_press(_BV(SWN))) {
+      drawMenuBoxOutline(selected,theme.cell_frame);
+      selected--;
+      if(selected<0){
+        selected = 2;
+      }
+      drawMenuBoxOutline(selected,theme.cursor_border);
+    }
+    
+    if (get_switch_press(_BV(SWC))) {
+      if(!selected){
+        if(!PUZZLE_HARDCODED){
+          generatePuzzle();
+        }
+        runGame();
+        drawMenu(selected);
+      } else if (selected == 1){        
+        eeprom_read_block((void*)numberMatrix, (const void*)storedMatrix, 81*sizeof(selected));
+        if(numberMatrix[0][0] != -1){
+          eeprom_read_block((void*)boolMatrix, (const void*)storedboolMatrix, 81*sizeof(selected));
+          runGame();
+          drawMenu(selected);
+        } else {
+          display_string_xy("No save data to load.",LCDHEIGHT/2-60,LCDWIDTH/2);
+        }
+
+      } else {
+        currentTheme++;
+        currentTheme = currentTheme % NUM_THEMES ;
+        theme = themeList[currentTheme];
+        drawMenu(selected);
+      }
+    }
+    
+  }
 }
 
 void drawMenuBoxOutline(int box, uint16_t col){
@@ -401,10 +421,12 @@ void generatePuzzle(){
   kpr = CLKPR;
   CLKPR = (1 << CLKPCE);
   CLKPR = 0;
-
-  fillBackground(theme.background);
+  
+  fillBackground(BLACK);
+  display_color(WHITE,BLACK);
   display_string_xy("Generating a Sudoku puzzle...",LCDHEIGHT/2-16*6,LCDWIDTH/2);
-
+  display_string_xy("Tip: Press the centre button to",LCDHEIGHT/2-16*6,LCDWIDTH*3/4);
+  display_string_xy("save game & check your solution!",LCDHEIGHT/2-16*6,LCDWIDTH*3/4 + 7);
   
   /*Sets the puzzle to empty, overriding any hardcoded numbers */
   for(i=0;i<9;i++){
