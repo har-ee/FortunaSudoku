@@ -49,6 +49,7 @@ int8_t pointerx =0;
 int8_t pointery =0;
 struct Theme theme = defaulttheme;
 int8_t currentTheme;
+int8_t difficulty;
   
 uint16_t EEMEM eepromseed;
 int8_t EEMEM storedMatrix[9][9];
@@ -214,6 +215,7 @@ void menu(){
   uint8_t i;
   uint8_t j;
   uint8_t bool;
+  char buffer[2];
   currentTheme = eeprom_read_word(&savedTheme);
   if(currentTheme<0 || currentTheme >= NUM_THEMES) currentTheme = 0;
   theme = themeList[currentTheme];
@@ -221,8 +223,33 @@ void menu(){
         
   int8_t selected;
   selected = 0;
+  difficulty = 7;
   drawMenu(selected);
   for(;;){
+    
+    if(!selected){
+      scan_encoder();
+      
+
+ 
+      int delta = os_enc_delta();
+      if(delta){
+        difficulty += delta;
+        if(difficulty <=0){
+          difficulty += 10;
+        } else if( difficulty>10){
+          difficulty -=10;
+        }
+        itoa(difficulty, buffer, 10);
+        display_string_xy(buffer,LCDHEIGHT/2 + 2 + (9)*6,99);
+        if(difficulty != 10){
+          display_string_xy(") ",LCDHEIGHT/2 + 2 + (10)*6,99);
+        } else {
+          display_string_xy(")",LCDHEIGHT/2 + 2 + (11)*6,99);
+        }
+      }
+    }
+    
     scan_switches();
     
     if (get_switch_press(_BV(SWS))) {
@@ -301,7 +328,7 @@ void drawMenuBoxOutline(int box, uint16_t col){
 void drawMenu(int selected){
   uint8_t x;
   uint8_t y;
-  
+  char buffer[2];  
   x = LCDHEIGHT/2 - (5.5*6);
   y = 40;
   fillBackground(theme.cell_frame);
@@ -316,7 +343,17 @@ void drawMenu(int selected){
   rect.top = 90;
   rect.bottom = 115;
   fill_rectangle(rect, theme.cell_background);
-  display_string_xy("New Game",LCDHEIGHT/2 - (8/2)*6,rect.top+9);
+  display_string_xy("New Game (Difficulty ",LCDHEIGHT/2 - (24)*3 + 2,rect.top+9);
+  
+  itoa(difficulty, buffer, 10);
+  display_string_xy(buffer,LCDHEIGHT/2 +  2 + (18)*3,99);
+
+  if(difficulty != 10){
+    display_string_xy(") ",LCDHEIGHT/2 + 2 + (20)*3,99);
+  } else {
+    display_string_xy(")",LCDHEIGHT/2 + 2 + (22)*3,99);
+  }
+  
 
   rect.top = 135;
   rect.bottom = 160;
@@ -460,10 +497,10 @@ void generatePuzzle(){
         count++;
       } else {
         numberMatrix[ran1][ran2] = oldvalue;
-        if(count >= MIN_MISSING_NUMBERS) break;
+        if(count >= 20 + difficulty*2.8) break;
       }
     }
-    if(count >= MAX_MISSING_NUMBERS) break;
+    if(count >= 20 + difficulty * 4) break;
   }
 
   /* populates the boolMatrix with our now complete puzzle */
