@@ -156,6 +156,9 @@
 #define WHITE                   0xFFFF
 #define WHITE_SMOKE             0xF79E
 #define YELLOW                  0xFFE0
+#define RAYNA_BANANA            0xFFF0
+#define RAYNA_YELLOW            0xFFA9
+#define RAYNA_DARK_PINK         0xD81B
 
 /*========================================================================\
 |  The MIT License (MIT)                                                  |

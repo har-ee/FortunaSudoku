@@ -7,12 +7,12 @@
 #include "themes.h"
 
 #define CELLSIZE 25 /*Odd number means text aligned in centre, should be > 7 */
-#define TOPLEFTX (LCDHEIGHT/2) - ((9*(CELLSIZE+1))/2)
-#define TOPLEFTY (LCDWIDTH/2) - ((9*(CELLSIZE+1))/2)
+#define TOPLEFTX (LCDHEIGHT/2) - ((9*(CELLSIZE+1))/2) - 1
+#define TOPLEFTY (LCDWIDTH/2) - ((9*(CELLSIZE+1))/2) - 1
 #define PUZZLE_HARDCODED 0
 
 /* In order to set difficulty or reduce load time */
-#define MAX_MISSING_NUMBERS 81
+#define MAX_MISSING_NUMBERS 60
 #define MIN_MISSING_NUMBERS 48
 
 /* drawing methods */
@@ -48,10 +48,12 @@ void runGame();
 int8_t pointerx =0;
 int8_t pointery =0;
 struct Theme theme = defaulttheme;
-
+int8_t currentTheme;
+  
 uint16_t EEMEM eepromseed;
 int8_t EEMEM storedMatrix[9][9];
 int8_t EEMEM storedboolMatrix[9][9];
+uint16_t EEMEM savedTheme;
 
 /*    SOLVED GRID
   {1,5,2,6,3,4,8,7,9},
@@ -184,11 +186,11 @@ void runGame(){
       } else {
         fillGridBackground(RED);
         display_color(WHITE,RED);
-        display_string_xy("Incorrect solution, but progress saved!",LCDHEIGHT/2-114,LCDWIDTH -9);
+        display_string_xy("Incorrect solution, but progress saved!",LCDHEIGHT/2-115,LCDWIDTH -9);
         eeprom_update_block((void*)numberMatrix, (const void*)storedMatrix, 81*sizeof(int8_t));
         eeprom_update_block((void*)boolMatrix, (const void*)storedboolMatrix, 81*sizeof(int8_t));
         fillGridBackground(RED);
-        display_string_xy("Incorrect solution, but progress saved!",LCDHEIGHT/2-114,LCDWIDTH -9);
+        display_string_xy("Incorrect solution, but progress saved!",LCDHEIGHT/2-115,LCDWIDTH -9);
         drawPuzzle();
         drawPointer();
 
@@ -209,9 +211,14 @@ void runGame(){
 }
 
 void menu(){
-  int8_t currentTheme;
-  currentTheme = 0;
+  uint8_t i;
+  uint8_t j;
+  uint8_t bool;
+  currentTheme = eeprom_read_word(&savedTheme);
+  if(currentTheme<0 || currentTheme >= NUM_THEMES) currentTheme = 0;
+  theme = themeList[currentTheme];
 
+        
   int8_t selected;
   selected = 0;
   drawMenu(selected);
@@ -243,7 +250,13 @@ void menu(){
         drawMenu(selected);
       } else if (selected == 1){        
         eeprom_read_block((void*)numberMatrix, (const void*)storedMatrix, 81*sizeof(selected));
-        if(numberMatrix[0][0] != -1){
+        bool = 1;
+        for(i=0;i<9;i++){
+          for(j=0;j<9;j++){
+            if(numberMatrix[i][j] < 0 || numberMatrix[i][j] > 9) bool = 0;
+          }
+        }
+        if(bool){
           eeprom_read_block((void*)boolMatrix, (const void*)storedboolMatrix, 81*sizeof(selected));
           runGame();
           drawMenu(selected);
@@ -254,8 +267,9 @@ void menu(){
       } else {
         currentTheme++;
         currentTheme = currentTheme % NUM_THEMES ;
+        eeprom_write_word(&savedTheme, currentTheme);
         theme = themeList[currentTheme];
-        drawMenu(selected);
+        drawMenu(selected);    
       }
     }
     
@@ -264,22 +278,22 @@ void menu(){
 
 void drawMenuBoxOutline(int box, uint16_t col){
   rectangle rect;
-  rect.top = 89 + 45*box;
-  rect.bottom = rect.top;
-  rect.left = LCDHEIGHT/2 - 76;
-  rect.right = LCDHEIGHT/2 + 76;
+  rect.top = 88 + 45*box;
+  rect.bottom = rect.top + 1;
+  rect.left = LCDHEIGHT/2 - 77;
+  rect.right = LCDHEIGHT/2 + 77;
   fill_rectangle(rect, col);
   
-  rect.top+= 27;
-  rect.bottom = rect.top;
+  rect.top+= 28;
+  rect.bottom = rect.top + 1;
   fill_rectangle(rect, col);
 
-  rect.right = rect.left;
-  rect.top -=27;
+  rect.right = rect.left+1;
+  rect.top -=28;
   fill_rectangle(rect, col);
   
-  rect.right = LCDHEIGHT/2 + 76;
-  rect.left = rect.right;
+  rect.right = LCDHEIGHT/2 + 77;
+  rect.left = rect.right - 1;
   fill_rectangle(rect, col);
   
 }
@@ -290,24 +304,15 @@ void drawMenu(int selected){
   
   x = LCDHEIGHT/2 - (5.5*6);
   y = 40;
-  fillBackground(theme.background);
-  fillGridBackground(theme.cell_frame);
+  fillBackground(theme.cell_frame);
+ // fillGridBackground(theme.cell_frame);
   display_color(theme.noneditable_numbers,theme.cell_frame);
   display_string_xy("S U D O K U",x,y);
   
-  rectangle rect;
-  rect.top = 89 + 45*selected;
-  rect.bottom = rect.top + 27;
-  rect.left = LCDHEIGHT/2 - 76;
-  rect.right = LCDHEIGHT/2 + 76;
-  fill_rectangle(rect, theme.cursor_border);
-  
-  
-  rect.left = LCDHEIGHT/2 - 75;
-  rect.right = LCDHEIGHT/2 + 75;
+  rectangle rect;  
   display_color(theme.editable_numbers,theme.cell_background);
-
-  
+  rect.left = LCDHEIGHT/2 - 75;
+  rect.right = LCDHEIGHT/2 + 75;  
   rect.top = 90;
   rect.bottom = 115;
   fill_rectangle(rect, theme.cell_background);
@@ -322,9 +327,12 @@ void drawMenu(int selected){
   rect.top = 180;
   rect.bottom = 205;
   fill_rectangle(rect, theme.cell_background);
-  display_string_xy("Theme",LCDHEIGHT/2 - 15,rect.top+9);
+  display_string_xy("Theme: ",LCDHEIGHT/2 - 21 - (3* 7),rect.top+9);
 
-    
+  display_string_xy(theme.theme_name,LCDHEIGHT/2 + 21 - (3* 7),180+9);
+
+  drawMenuBoxOutline(selected,theme.cursor_border);
+  
 
 }
 
@@ -530,8 +538,8 @@ void drawPuzzle(){
   rect.bottom = TOPLEFTY + (9*(CELLSIZE+1))+2;
   fill_rectangle(rect,theme.cell_frame);
   
-  for(i=0;i<9;i++){
-    for(j=0;j<9;j++){
+  for(j=0;j<9;j++){
+    for(i=0;i<9;i++){
       
         /* Number Cells */
         rect.left = getCellX(i);
