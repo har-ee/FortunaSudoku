@@ -11,9 +11,7 @@
 #define TOPLEFTY (LCDWIDTH/2) - ((9*(CELLSIZE+1))/2) - 1
 #define PUZZLE_HARDCODED 0
 
-/* In order to set difficulty or reduce load time */
-#define MAX_MISSING_NUMBERS 60
-#define MIN_MISSING_NUMBERS 48
+
 
 /* drawing methods */
 void drawMenu(int selected);
