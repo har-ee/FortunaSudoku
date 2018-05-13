@@ -26,9 +26,9 @@ The controls are very simple:
 == Puzzle Generation ==
 All puzzles generated are true Sudoku puzzles in that they have a single unique solved state.
 The method that I use to generate a puzzle:
-# Start with a blank grid
-# Use a backtracking algorithm to solve this grid, filling cells with a random order of numbers.
-# Use another algorithm to remove random cells, then checking whether the puzzle still has only one solution. This stops at some point in the range of (20 + difficulty*2.8) ≤ number of missing cells ≤ (20 + difficulty*4).
+* Start with a blank grid
+* Use a backtracking algorithm to solve this grid, filling cells with a random order of numbers.
+* Use another algorithm to remove random cells, then checking whether the puzzle still has only one solution. This stops at some point in the range of (20 + difficulty*2.8) ≤ number of missing cells ≤ (20 + difficulty*4).
 In order to get a different seed for the random function, I read a int from eeprom to use as the seed, this is then incremented and re-written to eeprom.
 
 == Themes ==
@@ -46,11 +46,11 @@ In the case that the eeprom has been overwritten, the load button will show the 
 
 == Using your own grid ==
 If you would like to supply your own Sudoku grid, rather than using a generated one:
-# Open the Sudoku.c file in a text editor.
-# Replace numberMatrix with the grid that you would like to use (0's are blank tiles).
-# Update boolMatrix to set the editable and noneditable numbers (You can copy the values of numberMatrix if you want only the ones defined in numberMatrix editable and others noneditable.
-# Change the value of PUZZLE_HARDCODED to 1.
-# In the menu, select new game (Don't worry about the difficulty!).
+* Open the Sudoku.c file in a text editor.
+* Replace numberMatrix with the grid that you would like to use (0's are blank tiles).
+* Update boolMatrix to set the editable and noneditable numbers (You can copy the values of numberMatrix if you want only the ones defined in numberMatrix editable and others noneditable.
+* Change the value of PUZZLE_HARDCODED to 1.
+* In the menu, select new game (Don't worry about the difficulty!).
 
 == Changing the display size of the grid ==
 If for some reason you would like to change the display size of the grid, you can do so by altering the value of CELLSIZE in Sudoku.c.
