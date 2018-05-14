@@ -11,8 +11,6 @@
 #define TOPLEFTY (LCDWIDTH/2) - ((9*(CELLSIZE+1))/2) - 1
 #define PUZZLE_HARDCODED 0
 
-
-
 /* drawing methods */
 void drawMenu(int selected);
 void drawMenuBoxOutline(int box,uint16_t col);
@@ -38,8 +36,9 @@ uint8_t checkSquare(uint8_t x, uint8_t y, int a);
 uint8_t checkRowandColumn(uint8_t x, uint8_t y, int a);
 uint8_t solveSudoku(uint32_t breakAt, uint8_t fillPuzzle);
 uint8_t randomSolveSudoku(uint32_t breakAt,uint8_t fillPuzzle);
-void generatePuzzle();
 
+/* Control methods */
+void generatePuzzle();
 void menu();
 void runGame();
 
@@ -78,6 +77,7 @@ uint16_t EEMEM savedTheme;
   {0,0,0,0,0,0,0,0,0}
 };*/
 
+/* Matrix used if PUZZLE_HARDCODED == 1 */
 int8_t numberMatrix[9][9]= {
   {1,5,0,6,3,0,0,7,9},
   {6,0,0,7,0,1,0,0,0},
@@ -115,7 +115,7 @@ int main(){
 
   init_lcd();
   set_orientation(West);
-  os_init_ruota();
+  os_init_ruota(); /* initialize buttons */
   
   menu();
 
@@ -132,13 +132,14 @@ void runGame(){
     scan_encoder();
     
     int delta = os_enc_delta();
-    if(delta){
-      if(!boolMatrix[pointery][pointerx]){
+    
+    if(delta){ /* If encoder has been moved */
+      if(!boolMatrix[pointery][pointerx]){ /* Only edit number if editable */
         numberMatrix[pointery][pointerx] += delta;
         if(numberMatrix[pointery][pointerx]<0) numberMatrix[pointery][pointerx] = 9;
         numberMatrix[pointery][pointerx] = numberMatrix[pointery][pointerx]%10;
         
-        if(numberMatrix[pointery][pointerx]){
+        if(numberMatrix[pointery][pointerx]){ /* Only draw non 0 numbers */
           display_color(theme.editable_numbers,theme.cell_background);
           drawNumber(pointerx,pointery,numberMatrix[pointery][pointerx]);
         } else {
@@ -148,14 +149,14 @@ void runGame(){
     }
     
     scan_switches();
-    if (get_switch_press(_BV(SWS))) {
+    if (get_switch_press(_BV(SWS))) { /* Down press */
       uint8_t oldx = pointerx;
       uint8_t oldy = pointery;
       pointery+=1;
       pointery = pointery%9;
       updatePointer(oldx,oldy);
     }
-    if (get_switch_press(_BV(SWN))) {
+    if (get_switch_press(_BV(SWN))) { /* Up press */
       uint8_t oldx = pointerx;
       uint8_t oldy = pointery;
       pointery-=1;
@@ -163,7 +164,7 @@ void runGame(){
       updatePointer(oldx,oldy);
     }
     
-   if (get_switch_press(_BV(SWE))) {
+   if (get_switch_press(_BV(SWE))) { /* Right press */
       uint8_t oldx = pointerx;
       uint8_t oldy = pointery;
       pointerx+=1;
@@ -171,7 +172,7 @@ void runGame(){
       updatePointer(oldx,oldy);
     }
     
-   if (get_switch_press(_BV(SWW))) {
+   if (get_switch_press(_BV(SWW))) { /* Left press */
       uint8_t oldx = pointerx;
       uint8_t oldy = pointery;
       pointerx-=1;
@@ -179,10 +180,10 @@ void runGame(){
       updatePointer(oldx,oldy);
     }
     
-    if (get_switch_press(_BV(SWC))) {
+    if (get_switch_press(_BV(SWC))) { /* Middle press */
       if(checkSolved()){
         break;
-      } else {
+      } else { /* ''Animation'' for wrong solution */
         fillGridBackground(RED);
         display_color(WHITE,RED);
         display_string_xy("Incorrect solution, but progress saved!",LCDHEIGHT/2-115,LCDWIDTH -9);
@@ -197,6 +198,7 @@ void runGame(){
       }
     }
   }
+  /* Once puzzle is solved */
   fillBackground(GREEN);
   drawPuzzle();
   display_color(theme.editable_numbers,LIME_GREEN);
@@ -215,7 +217,7 @@ void menu(){
   uint8_t bool;
   char buffer[2];
   currentTheme = eeprom_read_word(&savedTheme);
-  if(currentTheme<0 || currentTheme >= NUM_THEMES) currentTheme = 0;
+  if(currentTheme<0 || currentTheme >= NUM_THEMES) currentTheme = 0; /* if current theme isn't saved to eeprom */
   theme = themeList[currentTheme];
 
         
@@ -225,11 +227,9 @@ void menu(){
   drawMenu(selected);
   for(;;){
     
-    if(!selected){
+    /* Difficulty changing through rotary encoder */
+    if(!selected){ 
       scan_encoder();
-      
-
- 
       int delta = os_enc_delta();
       if(delta){
         difficulty += delta;
@@ -250,14 +250,14 @@ void menu(){
     
     scan_switches();
     
-    if (get_switch_press(_BV(SWS))) {
+    if (get_switch_press(_BV(SWS))) { /* Down press */
       drawMenuBoxOutline(selected,theme.cell_frame);
       selected++;
       selected = selected%3;
       drawMenuBoxOutline(selected,theme.cursor_border);
     }
     
-    if (get_switch_press(_BV(SWN))) {
+    if (get_switch_press(_BV(SWN))) { /* Up press */
       drawMenuBoxOutline(selected,theme.cell_frame);
       selected--;
       if(selected<0){
@@ -266,22 +266,27 @@ void menu(){
       drawMenuBoxOutline(selected,theme.cursor_border);
     }
     
-    if (get_switch_press(_BV(SWC))) {
-      if(!selected){
+    if (get_switch_press(_BV(SWC))) { /* Middle press */
+    
+
+      if(!selected){ /* If the pressed button is New Game */
         if(!PUZZLE_HARDCODED){
           generatePuzzle();
         }
         runGame();
         drawMenu(selected);
-      } else if (selected == 1){        
+      } 
+      
+      else if (selected == 1){  /* If the pressed button is Load Game */       
         eeprom_read_block((void*)numberMatrix, (const void*)storedMatrix, 81*sizeof(selected));
+        /* Checks the data in eeprom to determine if valid */
         bool = 1;
         for(i=0;i<9;i++){
           for(j=0;j<9;j++){
             if(numberMatrix[i][j] < 0 || numberMatrix[i][j] > 9) bool = 0;
           }
         }
-        if(bool){
+        if(bool){ /* If the eeprom holds a valid save */
           eeprom_read_block((void*)boolMatrix, (const void*)storedboolMatrix, 81*sizeof(selected));
           runGame();
           drawMenu(selected);
@@ -289,7 +294,7 @@ void menu(){
           display_string_xy("No save data to load.",LCDHEIGHT/2-60,LCDWIDTH/2);
         }
 
-      } else {
+      } else { /* If the pressed button is Theme */
         currentTheme++;
         currentTheme = currentTheme % NUM_THEMES ;
         eeprom_write_word(&savedTheme, currentTheme);
@@ -327,22 +332,24 @@ void drawMenu(int selected){
   uint8_t x;
   uint8_t y;
   char buffer[2];  
+  
+  /* Title */
   x = LCDHEIGHT/2 - (5.5*6);
   y = 40;
   fillBackground(theme.cell_frame);
- // fillGridBackground(theme.cell_frame);
   display_color(theme.noneditable_numbers,theme.cell_frame);
   display_string_xy("S U D O K U",x,y);
-  
-  rectangle rect;  
+ 
   display_color(theme.editable_numbers,theme.cell_background);
+  
+  /* New Game Button */
+  rectangle rect; 
   rect.left = LCDHEIGHT/2 - 75;
   rect.right = LCDHEIGHT/2 + 75;  
   rect.top = 90;
   rect.bottom = 115;
   fill_rectangle(rect, theme.cell_background);
-  display_string_xy("New Game (Difficulty ",LCDHEIGHT/2 - (24)*3 + 2,rect.top+9);
-  
+  display_string_xy("New Game (Difficulty ",LCDHEIGHT/2 - (24)*3 + 2,rect.top+9); 
   itoa(difficulty, buffer, 10);
   display_string_xy(buffer,LCDHEIGHT/2 +  2 + (18)*3,99);
 
@@ -352,22 +359,21 @@ void drawMenu(int selected){
     display_string_xy(")",LCDHEIGHT/2 + 2 + (22)*3,99);
   }
   
-
+  /* Load button */
   rect.top = 135;
   rect.bottom = 160;
   fill_rectangle(rect, theme.cell_background);
   display_string_xy("Load Game",LCDHEIGHT/2 - 27,rect.top+9);
 
-  
+  /* Theme button */
   rect.top = 180;
   rect.bottom = 205;
   fill_rectangle(rect, theme.cell_background);
   display_string_xy("Theme: ",LCDHEIGHT/2 - 21 - (3* 7),rect.top+9);
-
   display_string_xy(theme.theme_name,LCDHEIGHT/2 + 21 - (3* 7),180+9);
 
-  drawMenuBoxOutline(selected,theme.cursor_border);
-  
+  /* Highlights selected button */
+  drawMenuBoxOutline(selected,theme.cursor_border); 
 
 }
 
@@ -412,6 +418,7 @@ uint8_t randomSolveSudoku(uint32_t breakAt,uint8_t fillPuzzle){
   return 1;  
 }
 
+/* Faster solve method, when we don't need a random grid*/
 uint8_t solveSudoku(uint32_t breakAt,uint8_t fillPuzzle){
   uint8_t i;
   uint8_t j;
@@ -515,6 +522,7 @@ void generatePuzzle(){
     
 }
 
+/* Checks whether a 3x3 square is valid */
 uint8_t checkSquare(uint8_t x, uint8_t y, int a){
   uint8_t i;
   uint8_t j;
@@ -705,6 +713,7 @@ uint8_t checkSolved(){
   return 1;
 }
 
+/* Checks that a set of 9 numbers hold the correct properties for Sudoku */
 uint8_t checkSet(uint8_t set[9]){
   uint8_t sum = 0;
   uint8_t i;
