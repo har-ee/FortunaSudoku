@@ -14,8 +14,8 @@
 #define PUZZLE_HARDCODED 0
 
 /* drawing methods */
-void drawMenu(int selected);
-void drawMenuBoxOutline(int box,uint16_t col);
+void drawMenu(uint8_t selected);
+void drawMenuBoxOutline(uint8_t box,uint16_t col);
 void drawPuzzle();
 void drawPointer();
 void updatePointer(uint8_t oldx,uint8_t oldy);
@@ -34,8 +34,8 @@ uint8_t getCellY(uint8_t j);
 /* solution checking methods */
 uint8_t checkSolved();
 uint8_t checkSet(int8_t set[9]);
-uint8_t checkSquare(uint8_t x, uint8_t y, int a);
-uint8_t checkRowandColumn(uint8_t x, uint8_t y, int a);
+uint8_t checkSquare(uint8_t x, uint8_t y, uint8_t  a);
+uint8_t checkRowandColumn(uint8_t x, uint8_t y, uint8_t  a);
 uint8_t solveSudoku(uint32_t breakAt, uint8_t fillPuzzle);
 uint8_t randomSolveSudoku(uint32_t breakAt,uint8_t fillPuzzle);
 
@@ -121,7 +121,6 @@ int main(){
   
   menu();
 
-  return 0;
 }
 
 void runGame(){
@@ -310,7 +309,7 @@ void menu(){
   }
 }
 
-void drawMenuBoxOutline(int box, uint16_t col){
+void drawMenuBoxOutline(uint8_t box, uint16_t col){
   rectangle rect;
   rect.top = 88 + 45*box;
   rect.bottom = rect.top + 1;
@@ -332,7 +331,7 @@ void drawMenuBoxOutline(int box, uint16_t col){
   
 }
 
-void drawMenu(int selected){
+void drawMenu(uint8_t selected){
   uint8_t x;
   uint8_t y;
   char buffer[2]; 
@@ -464,13 +463,13 @@ uint8_t solveSudoku(uint32_t breakAt,uint8_t fillPuzzle){
 
 void generatePuzzle(){
 
-  int i;
-  int j;
-  int ran1;
-  int ran2;
-  int oldvalue;
-  int kpr;
-  int16_t count;
+  uint8_t i;
+  uint8_t j;
+  uint8_t ran1;
+  uint8_t ran2;
+  uint8_t oldvalue;
+  int8_t kpr;
+  uint8_t count;
   
   
   kpr = CLKPR;
@@ -527,8 +526,8 @@ void generatePuzzle(){
     
 }
 
-/* Checks whether a 3x3 square is valid */
-uint8_t checkSquare(uint8_t x, uint8_t y, int a){
+/* Checks whether a 3x3 square is valid if a is added to it */
+uint8_t checkSquare(uint8_t x, uint8_t y, uint8_t a){
   uint8_t i;
   uint8_t j;
   uint8_t subsquarex = (x/3);
@@ -542,7 +541,7 @@ uint8_t checkSquare(uint8_t x, uint8_t y, int a){
   return 1;
 }
 
-uint8_t checkRowandColumn(uint8_t x, uint8_t y, int a){
+uint8_t checkRowandColumn(uint8_t x, uint8_t y, uint8_t a){
   uint8_t i;
   for(i=0;i<9;i++){
       if(numberMatrix[i][y]==a) return 0;
