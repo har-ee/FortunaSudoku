@@ -20,7 +20,6 @@
 #define ALL_SWITCHES (_BV(SWC) | COMPASS_SWITCHES | _BV(OS_CD))
 
 
-int8_t os_enc_delta(void);
 volatile int8_t delta;
 
 
@@ -31,11 +30,10 @@ volatile uint8_t switch_rpt;     /* key long press and repeat */
  
 
 
-int scan_encoder(int state);
-int scan_switches(int state);
 
 
-void os_init_ruota(void) {
+
+void os_init_ruota() {
 
     /* Configure I/O Ports */
 	DDRE &= ~_BV(ROTA) & ~_BV(ROTB);  /* Rot. Encoder inputs */
@@ -52,7 +50,7 @@ void os_init_ruota(void) {
 }
 
 
-int scan_encoder(int state) {
+void scan_encoder() {
      static int8_t last;
      int8_t new, diff;
      uint8_t wheel;
@@ -69,8 +67,6 @@ int scan_encoder(int state) {
 	     delta += (diff & 2) - 1;	/* bit 1 = direction (+/-) */
      }
      sei();
-     
-     return state;
 }
 
 
@@ -90,7 +86,7 @@ int8_t os_enc_delta() {
 
 
 
-int scan_switches(int state) {
+void scan_switches() {
   static uint8_t ct0, ct1, rpt;
   uint8_t i;
  
@@ -116,7 +112,6 @@ int scan_switches(int state) {
   }
   sei();
   
-  return state;
 }
 
 

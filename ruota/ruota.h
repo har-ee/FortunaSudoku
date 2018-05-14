@@ -30,9 +30,12 @@
 #define REPEAT_START    60      /* after 600ms */
 #define REPEAT_NEXT     10      /* every 100ms */
  
-void os_init_ruota(void);
+void os_init_ruota();
 
-int8_t os_enc_delta(void);
+int8_t os_enc_delta();
+
+void scan_encoder();
+void scan_switches();
 
 uint8_t get_switch_press( uint8_t switch_mask );
 uint8_t get_switch_rpt( uint8_t switch_mask );

@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <avr/eeprom.h>
+
 #include "lcd.h"
+
 #include "ruota.h"
 #include "themes.h"
 
@@ -31,7 +33,7 @@ uint8_t getCellY(uint8_t j);
 
 /* solution checking methods */
 uint8_t checkSolved();
-uint8_t checkSet(uint8_t set[9]);
+uint8_t checkSet(int8_t set[9]);
 uint8_t checkSquare(uint8_t x, uint8_t y, int a);
 uint8_t checkRowandColumn(uint8_t x, uint8_t y, int a);
 uint8_t solveSudoku(uint32_t breakAt, uint8_t fillPuzzle);
@@ -123,15 +125,15 @@ int main(){
 }
 
 void runGame(){
+  int8_t delta;
   
   fillBackground(theme.background);
   drawPuzzle();
   drawPointer();
   for(;;){
     
-    scan_encoder();
-    
-    int delta = os_enc_delta();
+    scan_encoder(0);
+    delta = os_enc_delta();
     
     if(delta){ /* If encoder has been moved */
       if(!boolMatrix[pointery][pointerx]){ /* Only edit number if editable */
@@ -148,7 +150,7 @@ void runGame(){
       }
     }
     
-    scan_switches();
+    scan_switches(0);
     if (get_switch_press(_BV(SWS))) { /* Down press */
       uint8_t oldx = pointerx;
       uint8_t oldy = pointery;
@@ -204,7 +206,7 @@ void runGame(){
   display_color(theme.editable_numbers,LIME_GREEN);
   display_string_xy("Congratulations! You have completed this Sudoku!",LCDHEIGHT/2-24*6,LCDWIDTH/2);
   for(;;){
-    scan_switches();
+    scan_switches(0);
     if (get_switch_press(_BV(SWC))) {
       break;
     }
@@ -215,13 +217,15 @@ void menu(){
   uint8_t i;
   uint8_t j;
   uint8_t bool;
+  int8_t delta;
   char buffer[2];
+  int8_t selected;
+    
+    
   currentTheme = eeprom_read_word(&savedTheme);
   if(currentTheme<0 || currentTheme >= NUM_THEMES) currentTheme = 0; /* if current theme isn't saved to eeprom */
   theme = themeList[currentTheme];
-
-        
-  int8_t selected;
+  
   selected = 0;
   difficulty = 7;
   drawMenu(selected);
@@ -229,8 +233,8 @@ void menu(){
     
     /* Difficulty changing through rotary encoder */
     if(!selected){ 
-      scan_encoder();
-      int delta = os_enc_delta();
+      scan_encoder(0);
+      delta = os_enc_delta();
       if(delta){
         difficulty += delta;
         if(difficulty <=0){
@@ -248,7 +252,7 @@ void menu(){
       }
     }
     
-    scan_switches();
+    scan_switches(0);
     
     if (get_switch_press(_BV(SWS))) { /* Down press */
       drawMenuBoxOutline(selected,theme.cell_frame);
@@ -331,7 +335,9 @@ void drawMenuBoxOutline(int box, uint16_t col){
 void drawMenu(int selected){
   uint8_t x;
   uint8_t y;
-  char buffer[2];  
+  char buffer[2]; 
+  rectangle rect; 
+  
   
   /* Title */
   x = LCDHEIGHT/2 - (5.5*6);
@@ -343,7 +349,6 @@ void drawMenu(int selected){
   display_color(theme.editable_numbers,theme.cell_background);
   
   /* New Game Button */
-  rectangle rect; 
   rect.left = LCDHEIGHT/2 - 75;
   rect.right = LCDHEIGHT/2 + 75;  
   rect.top = 90;
@@ -465,7 +470,7 @@ void generatePuzzle(){
   int ran2;
   int oldvalue;
   int kpr;
-  uint16_t count;
+  int16_t count;
   
   
   kpr = CLKPR;
@@ -559,7 +564,7 @@ void fillBackground(uint16_t col){
   fill_rectangle(rect,col);
 }
 
-//Used to show red briefly for incorrect solution
+/* Used to show red briefly for incorrect solution */
 void fillGridBackground(uint16_t col){
   rectangle rect;
   rect.left = TOPLEFTX;
@@ -572,6 +577,8 @@ void fillGridBackground(uint16_t col){
 void drawPuzzle(){
   uint8_t i;
   uint8_t j;
+  char buffer[1];
+
   
   /* Background Square */
   rectangle rect;
@@ -596,12 +603,10 @@ void drawPuzzle(){
           
           if(boolMatrix[j][i]){
             display_color(theme.noneditable_numbers,theme.cell_background);
-            char buffer[1];
             itoa(numberMatrix[j][i],buffer,10);
             display_string_xy(buffer, (getCellX(i) + (CELLSIZE/2)-2), (getCellY(j)+((CELLSIZE/2)-3)));
           } else {
             display_color(theme.editable_numbers,theme.cell_background);
-            char buffer[1];
             itoa(numberMatrix[j][i],buffer,10);
             display_string_xy(buffer, (getCellX(i) + (CELLSIZE/2)-2), (getCellY(j)+((CELLSIZE/2)-3)));
             
@@ -681,8 +686,8 @@ uint8_t getCellY(uint8_t i){
 }
 
 uint8_t checkSolved(){
-  uint8_t set[9];
-  uint8_t arr[3][3][9];
+  int8_t set[9];
+  int8_t arr[3][3][9];
   
   uint8_t i;
   uint8_t j;
@@ -714,7 +719,7 @@ uint8_t checkSolved(){
 }
 
 /* Checks that a set of 9 numbers hold the correct properties for Sudoku */
-uint8_t checkSet(uint8_t set[9]){
+uint8_t checkSet(int8_t set[9]){
   uint8_t sum = 0;
   uint8_t i;
   uint8_t j;
