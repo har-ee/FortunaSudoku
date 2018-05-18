@@ -5,6 +5,8 @@
     http://www.mikrocontroller.net/articles/Drehgeber
 
     Slightly adapted by Klaus-Peter Zauner for FortunaOS, March 2015
+    
+    Adapted again by Harry Everett for FortunaSudoku, May 2018
 
 */
 
