@@ -28,7 +28,7 @@ All puzzles generated are true Sudoku puzzles in that they have a single unique 
 The method that I use to generate a puzzle:
 * Start with a blank grid
 * Use a backtracking algorithm to solve this grid, filling cells with a random order of numbers.
-* Use another algorithm to remove random cells, then checking whether the puzzle still has only one solution. This stops at some point in the range of (20 + difficulty*2.8) ≤ number of missing cells ≤ (20 + difficulty*4).
+* Use another algorithm to remove random cells, then checking whether the puzzle still has only one solution. This stops at some point in the range of (20 + difficulty\*2.8) ≤ number of missing cells ≤ (20 + difficulty\*4).
 In order to get a different seed for the random function, I read a int from eeprom to use as the seed, this is then incremented and re-written to eeprom.
 
 ## Themes
