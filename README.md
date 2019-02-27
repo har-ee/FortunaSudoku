@@ -20,8 +20,8 @@ The controls are very simple:
 * When the current pointed to cell is editable the rotary encoder can be used to change the value of the number in this cell.
 
 ## Sudoku rules
-*Each row and column should contain all of the numbers 1 through 9.
-*Each 3*3 subgrid should contain all of the numbers 1 through 9.
+* Each row and column should contain all of the numbers 1 through 9.
+* Each 3\*3 subgrid should contain all of the numbers 1 through 9.
 
 ## Puzzle Generation
 All puzzles generated are true Sudoku puzzles in that they have a single unique solved state.
@@ -33,7 +33,7 @@ In order to get a different seed for the random function, I read a int from eepr
 
 ## Themes
 In-game, the theme can be changed through the menu. At the time of me creating this page, there are 7 different themes which come pre-loaded on the game (Thanks to Rayna Bozhkova for creating some of these!)- I am happy to add any themes which people make.
-A int is stored in eeprom to indicate the selected theme, meaning if the Fortuna is turned off and on, the theme will be remembered.
+An int is stored in eeprom to indicate the selected theme, meaning if the Fortuna is turned off and on, the theme will be remembered.
 
 Themes can be created very easily be editing the themes.h file.
 When creating the theme just follow the format of the other adding themes (theme_name should be less than 11 characters), then increase the NUM_THEMES value and add the theme to the themeList.
